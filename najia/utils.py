@@ -213,11 +213,15 @@ def palace(symbol=None, index=None):  # inStr -> '111000'  # intNum -> 世爻
         return const.YAOS.index(nei)
 
     # 一二三六外卦宫
-    if index in (1, 2, 3, 6):
+    # WORLD_LINE_POSITIONS: 世爻在初、二、三、六爻时，外卦即为卦宫
+    WORLD_LINE_POSITIONS = (1, 2, 3, 6)
+    if index in WORLD_LINE_POSITIONS:
         return const.YAOS.index(wai)
 
     # 四五游魂内变更
-    if index in (4, 5) or hun == '游魂':
+    # 世爻在四、五爻或游魂卦时，内卦变爻后即为卦宫
+    WANDERING_SOUl_POSITIONS = (4, 5)
+    if index in WANDERING_SOUl_POSITIONS or hun == '游魂':
         symbol = ''.join([str(int(c) ^ 1) for c in nei])
         return const.YAOS.index(symbol)
 
@@ -290,11 +294,11 @@ def get_qin6(w1, w2):
 
 
 def get_guaci(name=None):
-    import pickle
+    import json
 
     try:
-        result = Path(__file__).parent / 'data' / 'guaci.pkl'
-        result = pickle.loads(result.read_bytes())
+        result = Path(__file__).parent / 'data' / 'guaci.json'
+        result = json.loads(result.read_text(encoding='utf-8'))
         result = result.get(name)
 
         return result

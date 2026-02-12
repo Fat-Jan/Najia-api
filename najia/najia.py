@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class Najia(object):
 
     def __init__(self, verbose=None):
-        self.verbose = (verbose, 2)[verbose > 2] or 0
+        self.verbose = 2 if verbose and verbose > 2 else (verbose) or 0
         self.bian = None  # 变卦
         self.hide = None  # 伏神
         self.data = None
@@ -100,15 +100,15 @@ class Najia(object):
         """
         计算伏神卦
 
-        :param gong:
-        :param qins:
-        :return:
+        :param gong: 卦宫索引
+        :param qins: 六亲列表
+        :return: 伏神卦信息字典
         """
         if gong is None:
-            raise Exception('')
+            raise ValueError('gong parameter is required for calculating hidden hexagram')
 
         if qins is None:
-            raise Exception('')
+            raise ValueError('qins parameter is required for calculating hidden hexagram')
 
         if len(set(qins)) < 5:
             mark = YAOS[gong] * 2
@@ -137,18 +137,18 @@ class Najia(object):
         """
         计算变卦
 
-        :param params:
-        :return:
+        :param params: 爻位参数列表
+        :param gong: 卦宫索引
+        :return: 变卦信息字典
         """
-
         if params is None:
-            raise Exception('')
+            raise ValueError('params parameter is required for calculating transformed hexagram')
 
         if type(params) == str:
             params = [x for x in params]
 
         if len(params) < 6:
-            raise Exception('')
+            raise ValueError('params must have at least 6 elements')
 
         if 3 in params or 4 in params:
             mark = ''.join(['1' if v in [1, 4] else '0' for v in params])
@@ -160,7 +160,7 @@ class Najia(object):
                 'mark': mark,
                 'qin6': qin6,
                 'qinx': qinx,
-                'gong': GUAS[palace(mark, set_shi_yao(mark)[0])],
+                'gong': GUAS[gong],  # Use original palace for correct six relatives calculation
             }
 
         return None
@@ -177,12 +177,12 @@ class Najia(object):
         :return:
         """
 
-        title = (title, '')[not title]
+        title = title if title else ''
         solar = arrow.now() if date is None else arrow.get(date)
         lunar = self._daily(solar)
 
         # gender = '男' if gender == 1 else '女'
-        gender = ('', gender)[bool(gender)]
+        gender = gender if bool(gender) else ''
 
         # 卦码
         mark = ''.join([str(int(p) % 2) for p in params])

@@ -1,5 +1,6 @@
 import logging
 import math
+from functools import lru_cache
 from pathlib import Path
 
 from . import const
@@ -271,21 +272,24 @@ def get_najia(symbol=None):
     return ngz + wgz
 
 
+@lru_cache(maxsize=25)
 def get_qin6(w1, w2):
     """
-    两个五行判断六亲
+    两个五行判断六亲（优化版 - 矩阵查找）
     水1 # 木2 # 金3 # 火4 # 土5
 
     :param w1:
     :param w2:
     :return:
     """
-    w1 = const.XING5.index(w1) if type(w1) is str else w1
-    w2 = const.XING5.index(w2) if type(w2) is str else w2
-
-    ws = w1 - w2
-    ws = ws + 5 if ws < 0 else ws
-    q6 = const.QING6[ws]
+    # 使用快速查找字典替代 O(n) 索引查找
+    w1_idx = const.XING5_DICT.get(w1, w1) if type(w1) is str else w1
+    w2_idx = const.XING5_DICT.get(w2, w2) if type(w2) is str else w2
+    
+    # 直接使用预计算矩阵（更高效）
+    # 五行生克关系：水生木，木生火，火生土，土生金，金生水
+    ws = (w2_idx - w1_idx) % 5  # 计算生克差值
+    q6 = const.QIN6_MATRIX[w1_idx][w2_idx]
 
     logger.debug(ws)
     logger.debug(q6)

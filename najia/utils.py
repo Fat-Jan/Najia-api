@@ -2,6 +2,7 @@ import logging
 import math
 from functools import lru_cache
 from pathlib import Path
+from typing import Tuple, List, Optional, Dict, Any
 
 from . import const
 
@@ -9,11 +10,11 @@ logging.basicConfig(level='INFO')
 logger = logging.getLogger(__name__)
 
 
-def GZ5X(gz=''):
+def GZ5X(gz: str = '') -> str:
     """
     干支五行
-    :param gz:
-    :return:
+    :param gz: 干支字符串
+    :return: 干支 + 五行
     """
     _, z = [i for i in gz]
     zm = const.ZHIS.index(z)
@@ -21,25 +22,23 @@ def GZ5X(gz=''):
     return gz + const.XING5[const.ZHI5[zm]]
 
 
-def mark(symbol=None):
+def mark(symbol: str = None) -> List[str]:
     """
     单拆重交 转 二进制卦码
-    :param symbol:
-    :return:
+    :param symbol: 符号
+    :return: 二进制列表
     """
-
     res = [str(int(x) % 2) for x in symbol]
     logger.debug(res)
 
     return res
 
 
-def xkong(gz='甲子'):
+def xkong(gz: str = '甲子') -> str:
     """
     计算旬空
-
     :param gz: 甲子 or 3,11
-    :return:
+    :return: 旬空字符串
     """
 
     gm, zm = [i for i in gz]
@@ -56,12 +55,11 @@ def xkong(gz='甲子'):
     return const.KONG[xk]
 
 
-def get_god6(gz=None):
+def get_god6(gz: str = None) -> List[str]:
     """
-    # 六神, 根据日干五行配对六神五行
-
+    六神, 根据日干五行配对六神五行
     :param gz: 日干支
-    :return:
+    :return: 六神列表
     """
 
     gm, _ = [i for i in gz]
@@ -99,55 +97,61 @@ def get_god6(gz=None):
 # 世爻 >= 3, 应爻 = 世爻 - 3， index = 5 - 世爻 + 1
 # 世爻 <= 3, 应爻 = 世爻 + 3，
 # life oneself
-def set_shi_yao(symbol=None):
+@lru_cache(maxsize=64)
+def set_shi_yao(symbol: str = None) -> Tuple[int, int, int]:
     """
-    获取世爻
-
+    获取世爻（优化版 - 使用预计算查表）
     :param symbol: 卦的二进制码
     :return: 世爻，应爻，所在卦宫位置
     """
-    wai = symbol[3:]  # 外卦
-    nei = symbol[:3]  # 内卦
+    try:
+        # 尝试使用预计算的查表
+        from . import const
+        return const.SHIYING_PRECOMPUTED[symbol]
+    except (ImportError, AttributeError, KeyError):
+        # 预计算尚未完成或失败，使用原始逻辑
+        wai = symbol[3:]  # 外卦
+        nei = symbol[:3]  # 内卦
 
-    def shiy(shi, index=None):
-        ying = shi - 3 if shi > 3 else shi + 3
-        index = shi if index is None else index
-        return shi, ying, index
+        def shiy(shi: int, index: int = None) -> Tuple[int, int, int]:
+            ying = shi - 3 if shi > 3 else shi + 3
+            index = shi if index is None else index
+            return shi, ying, index
 
-    # 天同二世天变五
-    if wai[2] == nei[2]:
-        if wai[1] != nei[1] and wai[0] != nei[0]:
-            return shiy(2)
-    else:
-        if wai[1] == nei[1] and wai[0] == nei[0]:
-            return shiy(5)
+        # 天同二世天变五
+        if wai[2] == nei[2]:
+            if wai[1] != nei[1] and wai[0] != nei[0]:
+                return shiy(2)
+        else:
+            if wai[1] == nei[1] and wai[0] == nei[0]:
+                return shiy(5)
 
-    # 人同游魂人变归
-    if wai[1] == nei[1]:
-        if wai[0] != nei[0] and wai[2] != nei[2]:
-            return shiy(4, 6)  # , Hun
-    else:
-        # fix 归魂问题
-        if wai[0] == nei[0] and wai[2] == nei[2]:
-            return shiy(3, 6)  # , Hun
+        # 人同游魂人变归
+        if wai[1] == nei[1]:
+            if wai[0] != nei[0] and wai[2] != nei[2]:
+                return shiy(4, 6)  # , Hun
+        else:
+            # fix 归魂问题
+            if wai[0] == nei[0] and wai[2] == nei[2]:
+                return shiy(3, 6)  # , Hun
 
-    # 地同四世地变初
-    if wai[0] == nei[0]:
-        if wai[1] != nei[1] and wai[2] != nei[2]:
-            return shiy(4)
-    else:
-        if wai[1] == nei[1] and wai[2] == nei[2]:
-            return shiy(1)
+        # 地同四世地变初
+        if wai[0] == nei[0]:
+            if wai[1] != nei[1] and wai[2] != nei[2]:
+                return shiy(4)
+        else:
+            if wai[1] == nei[1] and wai[2] == nei[2]:
+                return shiy(1)
 
-    # 本宫六世
-    if wai == nei:
-        return shiy(6)
+        # 本宫六世
+        if wai == nei:
+            return shiy(6)
 
-    # 三世异
-    return shiy(3)
+        # 三世异
+        return shiy(3)
 
 
-def get_type(symbol=None):
+def get_type(symbol: str = None) -> str:
     if res := soul(symbol):
         return res
 
@@ -160,7 +164,7 @@ def get_type(symbol=None):
     return ''
 
 
-def unite(symbol=None):
+def unite(symbol: str = None) -> Optional[str]:
     name = const.GUA64[symbol]
 
     for x in const.LIUHE:
@@ -170,7 +174,7 @@ def unite(symbol=None):
     return None
 
 
-def soul(symbol=None):
+def soul(symbol: str = None) -> Optional[str]:
     wai = symbol[3:]  # 外卦
     nei = symbol[:3]  # 内卦
     hun = ''
@@ -185,17 +189,15 @@ def soul(symbol=None):
     return hun
 
 
-def palace(symbol=None, index=None):  # inStr -> '111000'  # intNum -> 世爻
+def palace(symbol: str = None, index: int = None) -> int:  # inStr -> '111000'  # intNum -> 世爻
     """
     六爻卦的卦宫名
-
     认宫诀：
     一二三六外卦宫，四五游魂内变更。
     若问归魂何所取，归魂内卦是本宫。
-
     :param symbol: 卦的二进制码
     :param index: 世爻
-    :return:
+    :return: 卦宫索引
     """
 
     wai = symbol[3:]  # 外卦
@@ -211,25 +213,26 @@ def palace(symbol=None, index=None):  # inStr -> '111000'  # intNum -> 世爻
 
     # 归魂内卦是本宫
     if hun == '归魂':
-        return const.YAOS.index(nei)
+        return const.YAOS_DICT[nei]
 
     # 一二三六外卦宫
     # WORLD_LINE_POSITIONS: 世爻在初、二、三、六爻时，外卦即为卦宫
     WORLD_LINE_POSITIONS = (1, 2, 3, 6)
     if index in WORLD_LINE_POSITIONS:
-        return const.YAOS.index(wai)
+        return const.YAOS_DICT[wai]
 
     # 四五游魂内变更
     # 世爻在四、五爻或游魂卦时，内卦变爻后即为卦宫
-    WANDERING_SOUl_POSITIONS = (4, 5)
-    if index in WANDERING_SOUl_POSITIONS or hun == '游魂':
-        symbol = ''.join([str(int(c) ^ 1) for c in nei])
-        return const.YAOS.index(symbol)
+    WANDERING_SOUL_POSITIONS = (4, 5)
+    if index in WANDERING_SOUL_POSITIONS or hun == '游魂':
+        # 使用位运算优化内卦变爻
+        nei_int = int(nei, 2)
+        transformed_nei = nei_int ^ 0b111  # 快速计算卦的反卦
+        symbol = format(transformed_nei, '03b')
+        return const.YAOS_DICT[symbol]
 
 
-# 判断是否六冲卦
-# verb
-def attack(symbol):
+def attack(symbol: str = None) -> bool:
     wai = symbol[3:]  # 外卦
     nei = symbol[:3]  # 内卦
 
@@ -249,43 +252,31 @@ def attack(symbol):
     return False
 
 
-# 纳甲配干支
-def get_najia(symbol=None):
+# 纳甲配干支（优化版 - 预计算查表）
+def get_najia(symbol: str = None) -> List[str]:
     """
-    纳甲配干支
+    纳甲配干支（优化版 - 使用预计算查表）
 
-    :param symbol:
-    :return:
+    :param symbol: 卦的二进制码 (e.g., '111000')
+    :return: 6个干支列表
     """
-
-    wai = symbol[3:]  # 外卦
-    nei = symbol[:3]  # 内卦
-
-    wai, nei = const.YAOS.index(wai), const.YAOS.index(nei)
-
-    gan = const.NAJIA[nei][0][0]
-    ngz = [f'{gan}{zhi}' for zhi in const.NAJIA[nei][0][1:]]  # 排干支
-
-    gan = const.NAJIA[wai][1][0]
-    wgz = [f'{gan}{zhi}' for zhi in const.NAJIA[wai][1][1:]]  # 排干支
-
-    return ngz + wgz
+    # 使用预计算的64卦象纳甲查表 - O(1) 查找
+    return const.NAJIA_PRECOMPUTED[symbol]
 
 
 @lru_cache(maxsize=25)
-def get_qin6(w1, w2):
+def get_qin6(w1: str | int, w2: str | int) -> str:
     """
     两个五行判断六亲（优化版 - 矩阵查找）
     水1 # 木2 # 金3 # 火4 # 土5
-
-    :param w1:
-    :param w2:
-    :return:
+    :param w1: 第一个五行（支持字符串或整数）
+    :param w2: 第二个五行（支持字符串或整数）
+    :return: 六亲字符串
     """
     # 使用快速查找字典替代 O(n) 索引查找
-    w1_idx = const.XING5_DICT.get(w1, w1) if type(w1) is str else w1
-    w2_idx = const.XING5_DICT.get(w2, w2) if type(w2) is str else w2
-    
+    w1_idx = const.XING5_DICT.get(w1, w1) if isinstance(w1, str) else w1
+    w2_idx = const.XING5_DICT.get(w2, w2) if isinstance(w2, str) else w2
+
     # 直接使用预计算矩阵（更高效）
     # 五行生克关系：水生木，木生火，火生土，土生金，金生水
     ws = (w2_idx - w1_idx) % 5  # 计算生克差值
@@ -297,14 +288,16 @@ def get_qin6(w1, w2):
     return q6
 
 
-def get_guaci(name=None):
+def get_guaci(name: str) -> Optional[Dict[str, Any]]:
     import json
 
     try:
         result = Path(__file__).parent / 'data' / 'guaci.json'
-        result = json.loads(result.read_text(encoding='utf-8'))
-        result = result.get(name)
+        with open(result, encoding='utf-8') as f:
+            data = json.load(f)
+        result = data.get(name)
 
         return result
     except Exception as ex:
         logger.exception(ex)
+        return None

@@ -1,12 +1,17 @@
 import json
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Tuple, Optional, Dict, Any
 
 import arrow
 from jinja2 import Template
 
+from .batch import BatchProcessor, BatchResult
+
 from .const import GANS
+from . import const
 from .const import GUA5
 from .const import GUA64
 from .const import GUAS
@@ -23,6 +28,7 @@ from .utils import get_type
 from .utils import GZ5X
 from .utils import palace
 from .utils import set_shi_yao
+from .result import HexagramResult, HiddenHexagram, TransformedHexagram
 
 logging.basicConfig(level='INFO')
 logger = logging.getLogger(__name__)
@@ -30,36 +36,40 @@ logger = logging.getLogger(__name__)
 
 class Najia(object):
 
-    def __init__(self, verbose=None):
-        self.verbose = 2 if verbose and verbose > 2 else (verbose) or 0
+    def __init__(self, verbose: int = 0):
+        """
+        初始化纳甲类实例
+        :param verbose: 详细程度（0-2）
+        """
+        self.verbose = 2 if verbose and verbose > 2 else verbose or 0
         self.bian = None  # 变卦
         self.hide = None  # 伏神
-        self.data = None
+        self.result: Optional[HexagramResult] = None
 
     @staticmethod
-    def _gz(cal):
+    def _gz(cal: Any) -> str:
         """
         获取干支
-        :param cal:
-        :return:
+        :param cal: 日历对象
+        :return: 干支字符串
         """
         return GANS[cal.tg] + ZHIS[cal.dz]
 
     @staticmethod
-    def _cn(cal):
+    def _cn(cal: Any) -> str:
         """
         转换中文干支
-        :param cal:
-        :return:
+        :param cal: 日历对象
+        :return: 中文干支字符串
         """
         return GANS[cal.tg] + ZHIS[cal.dz]
 
     @staticmethod
-    def _daily(date=None):
+    def _daily(date: arrow.Arrow) -> Dict[str, Any]:
         """
         计算日期
-        :param date:
-        :return:
+        :param date: Arrow 日期对象
+        :return: 包含农历信息的字典
         """
         # lunar = sxtwl.Lunar()
         # daily = lunar.getDayBySolar(date.year, date.month, date.day)
@@ -96,50 +106,49 @@ class Najia(object):
         return result
 
     @staticmethod
-    def _hidden(gong=None, qins=None):
+    def _hidden(gong_idx: int = None, qins: List[str] = None) -> Optional[HiddenHexagram]:
         """
         计算伏神卦
-
-        :param gong: 卦宫索引
+        :param gong_idx: 卦宫索引
         :param qins: 六亲列表
-        :return: 伏神卦信息字典
+        :return: 伏神卦信息或None
         """
-        if gong is None:
-            raise ValueError('gong parameter is required for calculating hidden hexagram')
+        if gong_idx is None:
+            raise ValueError('gong_idx parameter is required for calculating hidden hexagram')
 
         if qins is None:
             raise ValueError('qins parameter is required for calculating hidden hexagram')
 
         if len(set(qins)) < 5:
-            mark = YAOS[gong] * 2
+            mark = YAOS[gong_idx] * 2
 
             logger.debug(mark)
 
             # 六亲
-            qin6 = [(get_qin6(XING5[int(GUA5[gong])], ZHI5[ZHIS.index(x[1])])) for x in get_najia(mark)]
+            palace_element_idx = const.XING5_DICT[const.XING5[int(const.GUA5[gong_idx])]]
+            qin6 = [(get_qin6(palace_element_idx, const.ZHI5[const.ZHIS_DICT[x[1]]])) for x in get_najia(mark)]
 
             # 干支五行
             qinx = [GZ5X(x) for x in get_najia(mark)]
             seat = [qin6.index(x) for x in list(set(qin6).difference(set(qins)))]
 
-            return {
-                'name': GUA64.get(mark),
-                'mark': mark,
-                'qin6': qin6,
-                'qinx': qinx,
-                'seat': seat,
-            }
+            return HiddenHexagram(
+                name=GUA64.get(mark),
+                mark=mark,
+                qin6=qin6,
+                qinx=qinx,
+                seat=seat
+            )
 
         return None
 
     @staticmethod
-    def _transform(params=None, gong=None):
+    def _transform(params: List[int] = None, gong_idx: int = None) -> Optional[TransformedHexagram]:
         """
         计算变卦
-
         :param params: 爻位参数列表
-        :param gong: 卦宫索引
-        :return: 变卦信息字典
+        :param gong_idx: 卦宫索引
+        :return: 变卦信息或None
         """
         if params is None:
             raise ValueError('params parameter is required for calculating transformed hexagram')
@@ -152,169 +161,217 @@ class Najia(object):
 
         if 3 in params or 4 in params:
             mark = ''.join(['1' if v in [1, 4] else '0' for v in params])
-            qin6 = [(get_qin6(XING5[int(GUA5[gong])], ZHI5[ZHIS.index(x[1])])) for x in get_najia(mark)]
+            palace_element_idx = const.XING5_DICT[const.XING5[int(const.GUA5[gong_idx])]]
+            qin6 = [(get_qin6(palace_element_idx, const.ZHI5[const.ZHIS_DICT[x[1]]])) for x in get_najia(mark)]
             qinx = [GZ5X(x) for x in get_najia(mark)]
 
-            return {
-                'name': GUA64.get(mark),
-                'mark': mark,
-                'qin6': qin6,
-                'qinx': qinx,
-                'gong': GUAS[gong],  # Use original palace for correct six relatives calculation
-            }
+            return TransformedHexagram(
+                name=GUA64.get(mark),
+                mark=mark,
+                qin6=qin6,
+                qinx=qinx,
+                gong=GUAS[gong_idx],  # Use original palace for correct six relatives calculation
+                hexagram_type=get_type(mark)
+            )
 
         return None
 
-    def compile(self, params=None, gender=None, date=None, title=None, guaci=False, **kwargs):
+    def compile(self, params: List[int] = None, gender: str = None, date: str = None,
+                title: str = None, guaci: bool = False, **kwargs) -> 'Najia':
         """
         根据参数编译卦
-
-        :param guaci:
-        :param title:
-        :param gender:
-        :param params:
-        :param date:
-        :return:
+        :param params: 爻位参数列表
+        :param gender: 性别
+        :param date: 日期
+        :param title: 标题
+        :param guaci: 是否包含卦象文本
+        :return: Najia实例
         """
-
         title = title if title else ''
         solar = arrow.now() if date is None else arrow.get(date)
         lunar = self._daily(solar)
-
-        # gender = '男' if gender == 1 else '女'
         gender = gender if bool(gender) else ''
 
         # 卦码
         mark = ''.join([str(int(p) % 2) for p in params])
 
-        shiy = set_shi_yao(mark)  # 世应爻
+        # 世应爻
+        shiy = set_shi_yao(mark)  # 获取世应位置
 
         # 卦宫
-        gong = palace(mark, shiy[0])  # 卦宫
+        gong_idx = palace(mark, shiy[0])  # 计算卦宫
 
         # 卦名
         name = GUA64[mark]
 
-        # 六亲
-        qin6 = [(get_qin6(XING5[int(GUA5[gong])], ZHI5[ZHIS.index(x[1])])) for x in get_najia(mark)]
-        qinx = [GZ5X(x) for x in get_najia(mark)]
+        # 纳甲干支
+        najia_list = get_najia(mark)
 
-        # logger.debug(qin6)
+        # 六亲计算
+        # 使用快速字典查找替代 .index() 调用
+        palace_element_idx = const.XING5_DICT[const.XING5[int(const.GUA5[gong_idx])]]
+        qin6 = [(get_qin6(palace_element_idx, const.ZHI5[const.ZHIS_DICT[x[1]]])) for x in najia_list]
+        qinx = [GZ5X(x) for x in najia_list]
 
         # 六神
-        # god6 = God6(''.join([GANS[lunar['day'].tg], ZHIS[lunar['day'].dz]]))
         god6 = get_god6(lunar['gz']['day'])
 
         # 动爻位置
         dong = [i for i, x in enumerate(params) if x > 2]
-        # logger.debug(dong)
 
         # 伏神
-        hide = self._hidden(gong, qin6)
+        hide = self._hidden(gong_idx, qin6)
 
         # 变卦
-        bian = self._transform(params=params, gong=gong)
+        bian = self._transform(params=params, gong_idx=gong_idx)
 
-        self.data = {
-            'params': params,
-            'gender': gender,
-            'title': title,
-            'guaci': guaci,
-            'solar': solar,
-            'lunar': lunar,
-            'god6': god6,
-            'dong': dong,
-            'name': name,
-            'mark': mark,
-            'gong': GUAS[gong],
-            'shiy': shiy,
-            'qin6': qin6,
-            'qinx': qinx,
-            'bian': bian,
-            'hide': hide,
-        }
-
-        # logger.debug(self.data)
+        # 创建数据类
+        self.result = HexagramResult(
+            params=params,
+            mark=mark,
+            name=name,
+            gong=GUAS[gong_idx],  # Convert index to palace name
+            shiy=shiy,
+            qin6=qin6,
+            qinx=qinx,
+            god6=god6,
+            dong=dong,
+            solar=solar.isoformat(),
+            lunar=lunar,
+            hexagram_type=get_type(mark),
+            guaci=get_guaci(name) if guaci else None,
+            bian=bian,
+            hide=hide
+        )
 
         return self
 
-    def gua_type(self, i):
+    def gua_type(self, i: int) -> None:
         return
 
-    def render(self):
+    def render(self) -> str:
         """
+        渲染卦象为字符串
+        :return: 渲染后的字符串
+        """
+        if self.result is None:
+            raise ValueError("No result to render. Call compile() first.")
 
-        :return:
-        """
         tpl = Path(__file__).parent / 'data' / 'standard.tpl'
         tpl = tpl.read_text(encoding='utf-8')
 
-        empty = '\u3000' * 6
-        rows = self.data
-
-        # symbal = ['━　━', '━━━━', '━　━', '○→', '×→']
-        # yaos = ['▅▅  ▅▅', '▅▅▅▅▅▅', '▅▅  ▅▅', '○→', '×→']
         symbal = SYMBOL[self.verbose]
 
-        rows['dyao'] = [symbal[x] if x in (3, 4) else '' for x in self.data['params']]
+        # 世应爻
+        shiy = []
+        for x in range(0, 6):
+            if x == self.result.shiy[0] - 1:
+                shiy.append('世')
+            elif x == self.result.shiy[1] - 1:
+                shiy.append('应')
+            else:
+                shiy.append('  ')
 
-        rows['main'] = {}
-        rows['main']['mark'] = [symbal[int(x)] for x in self.data['mark']]
-        rows['main']['type'] = get_type(self.data['mark'])
+        empty = '\u3000' * 6
+        rows = {
+            'solar': self.result.solar,
+            'lunar': self.result.lunar,
+            'guaci': self.result.guaci,
+            'gender': getattr(self.result, 'gender', ''),
+            'title': getattr(self.result, 'title', ''),
+            'name': self.result.name,
+            'qin6': self.result.qin6,
+            'qinx': self.result.qinx,
+            'god6': self.result.god6,
+            'shiy': shiy,
+            'dyao': [symbal[x] if x in (3, 4) else '' for x in self.result.dong],
+        }
 
-        rows['main']['gong'] = rows['gong']
-        rows['main']['name'] = rows['name']
-        rows['main']['indent'] = '\u3000' * 2
+        # 主卦
+        rows['main'] = {
+            'mark': [symbal[int(x)] for x in self.result.mark],
+            'type': self.result.hexagram_type,
+            'gong_idx': self.result.gong,
+            'name': self.result.name,
+            'indent': '\u3000' * 2,
+            'dyao': [symbal[x] if x in (3, 4) else '' for x in self.result.dong]
+        }
 
-        if rows.get('hide'):
-            rows['hide']['qin6'] = [' %s%s ' % (rows['hide']['qin6'][x], rows['hide']['qinx'][x]) if x in rows['hide']['seat'] else empty for x in range(0, 6)]
+        # 伏神
+        if self.result.hide:
+            rows['hide'] = {
+                'qin6': [' %s%s ' % (self.result.hide.qin6[x], self.result.hide.qinx[x]) if x in self.result.hide.seat else empty for x in range(0, 6)]
+            }
             rows['main']['indent'] += empty
         else:
             rows['main']['indent'] += '\u3000' * 1
             rows['hide'] = {'qin6': ['  ' for _ in range(0, 6)]}
 
-        rows['main']['display'] = '{indent}{name} ({gong}-{type})'.format(**rows['main'])
+        rows['main']['display'] = '{indent}{name} ({gong_idx}-{type})'.format(**rows['main'])
 
-        if rows.get('bian'):
-            hide = (8, 19)[bool(rows.get('hide'))]
-            rows['bian']['type'] = get_type(rows['bian']['mark'])
-            rows['bian']['indent'] = (hide - len(rows['main']['display'])) * '\u3000'
-
-            if rows['bian']['qin6']:
-                # 变卦六亲问题
-                rows['bian']['qin6'] = [f'{rows["bian"]["qin6"][x]}{rows["bian"]["qinx"][x]}' if x in self.data['dong'] else f'  {rows["bian"]["qin6"][x]}{rows["bian"]["qinx"][x]}'
-                                        for x in range(0, 6)]
-
-            if rows['bian']['mark']:
-                rows['bian']['mark'] = [x for x in rows['bian']['mark']]
-                rows['bian']['mark'] = [symbal[int(rows['bian']['mark'][x])] for x in range(0, 6)]
+        # 变卦
+        if self.result.bian:
+            hide_width = 8 if self.result.hide else 0
+            rows['bian'] = {
+                'type': get_type(self.result.bian.mark),
+                'indent': (hide_width - len(rows['main']['display'])) * '\u3000',
+                'qin6': [f'{self.result.bian.qin6[x]}{self.result.bian.qinx[x]}' if x in self.result.dong else f'  {self.result.bian.qin6[x]}{self.result.bian.qinx[x]}' for x in range(0, 6)],
+                'mark': [symbal[int(x)] for x in self.result.bian.mark] if self.result.bian.mark else [' ' for _ in range(0, 6)]
+            }
         else:
             rows['bian'] = {'qin6': [' ' for _ in range(0, 6)], 'mark': [' ' for _ in range(0, 6)]}
 
+        # 世应
         shiy = []
-
-        # 显示世应字
         for x in range(0, 6):
-            if x == self.data['shiy'][0] - 1:
+            if x == self.result.shiy[0] - 1:
                 shiy.append('世')
-            elif x == self.data['shiy'][1] - 1:
+            elif x == self.result.shiy[1] - 1:
                 shiy.append('应')
             else:
                 shiy.append('  ')
 
         rows['shiy'] = shiy
 
-        if self.data['guaci']:
-            rows['guaci'] = get_guaci(rows['name'])
-            # rows['guaci'] = json.load(open(os.path.join(os.path.dirname(__file__), 'data/dd.json'))).get(rows['name'])
-            # rows['guaci'] = rows.get('guaci', '').replace('********************', '').replace('　象曰：', '象曰：')
+        # 卦象文本
+        if self.result.guaci:
+            rows['guaci'] = get_guaci(self.result.name)
 
         template = Template(tpl)
         return template.render(**rows)
 
-    def export(self):
-        solar, params = self.data
-        return solar, params
+    def export(self) -> Dict[str, Any]:
+        """导出为字典"""
+        if self.result is None:
+            raise ValueError("No result to export. Call compile() first.")
+        return self.result.to_dict()
 
-    def predict(self):
+    def predict(self) -> None:
+        """占卦预测（预留接口）"""
         return
+
+    def batch_process(self,
+                      params_list: List[List[int]],
+                      dates: List[str] = None,
+                      genders: List[str] = None,
+                      titles: List[str] = None,
+                      guaci: bool = False,
+                      max_workers: int = 4) -> BatchResult:
+        """
+        批量处理卦象
+        :param params_list: 爻位参数列表的列表
+        :param dates: 日期列表
+        :param genders: 性别列表
+        :param titles: 标题列表
+        :param guaci: 是否包含卦象文本
+        :param max_workers: 最大并发工作线程数
+        :return: 批量处理结果
+        """
+        processor = BatchProcessor(max_workers=max_workers)
+        return processor.process_batch(
+            params_list=params_list,
+            dates=dates,
+            genders=genders,
+            titles=titles,
+            guaci=guaci
+        )

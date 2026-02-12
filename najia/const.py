@@ -87,8 +87,7 @@ QIN6_MATRIX = [
     ['官鬼', '兄弟', '子孙', '妻财', '父母'],  # 金, 火, 木, 水, 土
     # 金(行) - 世爻为金
     ['父母', '兄弟', '子孙', '妻财', '官鬼'],  # 水, 木, 土, 火, 金
-]YAOS_DICT = {trigram: idx for idx, trigram in enumerate(YAOS)}
-ZHI5 = (4, 2, 0, 0, 2, 1, 1, 2, 3, 3, 2, 4)
+]YAOS_DICT = {trigram: idx for idx, trigram in enumerate(YAOS)}ZHI5 = (4, 2, 0, 0, 2, 1, 1, 2, 3, 3, 2, 4)
 
 # 旬空
 KONG = ('子丑', '寅卯', '辰巳', '午未', '申酉', '戌亥')

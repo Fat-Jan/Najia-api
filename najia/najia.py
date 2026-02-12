@@ -30,6 +30,8 @@ from .utils import palace
 from .utils import set_shi_yao
 from .result import HexagramResult, HiddenHexagram, TransformedHexagram
 from .log import setup_logger
+from .lunar_utils import date_to_yue_ri_chen
+from .time_analysis import calc_yue_ling, is_yue_po, is_xun_kong, calc_liu_shen
 
 logger = setup_logger(__name__)
 
@@ -177,7 +179,8 @@ class Najia(object):
         return None
 
     def compile(self, params: List[int] = None, gender: str = None, date: str = None,
-                title: str = None, guaci: bool = False, **kwargs) -> 'Najia':
+                title: str = None, guaci: bool = False, 
+                yue_zhi: str = None, ri_chen: str = None, **kwargs) -> 'Najia':
         """
         根据参数编译卦
         :param params: 爻位参数列表
@@ -185,12 +188,27 @@ class Najia(object):
         :param date: 日期
         :param title: 标题
         :param guaci: 是否包含卦象文本
+        :param yue_zhi: 月建地支（如'寅'），优先级低于date
+        :param ri_chen: 日辰干支（如'甲子'），优先级低于date
         :return: Najia实例
         """
         title = title if title else ''
         solar = arrow.now() if date is None else arrow.get(date)
         lunar = self._daily(solar)
         gender = gender if bool(gender) else ''
+
+        # 时间参数处理：date > yue_zhi/ri_chen > 默认不处理
+        actual_yue_zhi = yue_zhi
+        actual_ri_chen = ri_chen
+        if date is not None:
+            actual_yue_zhi, actual_ri_chen = date_to_yue_ri_chen(date)
+        elif yue_zhi is None and ri_chen is None:
+            # 使用当前日期的农历信息
+            try:
+                actual_yue_zhi = lunar.get('month_zhi') or lunar.get('gz', {}).get('month', ['',''])[0][-1] if hasattr(lunar, 'get') else None
+                actual_ri_chen = lunar.get('gz', {}).get('day', '')
+            except:
+                pass
 
         # 卦码
         mark = ''.join([str(int(p) % 2) for p in params])
@@ -225,6 +243,42 @@ class Najia(object):
         # 变卦
         bian = self._transform(params=params, gong_idx=gong_idx)
 
+        # 时间维度断卦属性计算
+        yue_ling_list = None
+        yue_po_list = None
+        xun_kong_list = None
+        
+        if actual_yue_zhi is not None or actual_ri_chen is not None:
+            # 提取每个爻的地支（从纳甲干支中获取）
+            yao_dizhi_list = [najia_list[i][1] if len(najia_list[i]) > 1 else '' for i in range(6)]
+            
+            if actual_yue_zhi is not None:
+                # 计算月令旺衰和月破
+                # 使用 ZHIS_DICT 获取地支索引，然后用 ZHI5 获取五行索引
+                yao_wuxing_idx_list = []
+                for d in yao_dizhi_list:
+                    if d and d in const.ZHIS_DICT:
+                        zhi_idx = const.ZHIS_DICT[d]
+                        wuxing_idx = const.ZHI5[zhi_idx] if zhi_idx < len(const.ZHI5) else 0
+                        yao_wuxing_idx_list.append(wuxing_idx)
+                    else:
+                        yao_wuxing_idx_list.append(None)
+                
+                wuxing_str_list = [const.XING5[w] if w is not None and 0 <= w < len(const.XING5) else '' for w in yao_wuxing_idx_list]
+                
+                valid_dizhi = {'子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'}
+                if actual_yue_zhi and actual_yue_zhi in valid_dizhi:
+                    yue_ling_list = [calc_yue_ling(w, actual_yue_zhi) if w else '' for w in wuxing_str_list]
+                    yue_po_list = [is_yue_po(d, actual_yue_zhi) if d else False for d in yao_dizhi_list]
+                else:
+                    yue_ling_list = None
+                    yue_po_list = None
+            
+            if actual_ri_chen is not None:
+                # 计算旬空和六神
+                xun_kong_list = [is_xun_kong(d, actual_ri_chen) if d else False for d in yao_dizhi_list]
+                liu_shen_list = [calc_liu_shen(i, actual_ri_chen) if i is not None else None for i in range(6)]
+
         # 创建数据类
         self.result = HexagramResult(
             params=params,
@@ -241,7 +295,13 @@ class Najia(object):
             hexagram_type=get_type(mark),
             guaci=get_guaci(name) if guaci else None,
             bian=bian,
-            hide=hide
+            hide=hide,
+            yue_ling=yue_ling_list,
+            yue_po=yue_po_list,
+            xun_kong=xun_kong_list,
+            liu_shen=liu_shen_list if actual_ri_chen else None,
+            yue_zhi=actual_yue_zhi,
+            ri_chen=actual_ri_chen
         )
 
         return self

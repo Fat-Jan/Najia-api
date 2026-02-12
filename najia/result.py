@@ -62,6 +62,13 @@ class HexagramResult:
     guaci: Optional[Dict[str, Any]] = None  # 卦辞
     bian: Optional[TransformedHexagram] = None  # 变卦
     hide: Optional[HiddenHexagram] = None     # 伏神
+    # 时间维度断卦属性
+    yue_ling: Optional[List[str]] = None     # 月令旺衰 ['旺', '相', ...]
+    yue_po: Optional[List[bool]] = None       # 月破 [True, False, ...]
+    xun_kong: Optional[List[bool]] = None     # 旬空 [True, False, ...]
+    liu_shen: Optional[List[str]] = None      # 六神 ['青龙', '朱雀', ...]
+    yue_zhi: Optional[str] = None            # 月建地支
+    ri_chen: Optional[str] = None             # 日辰干支
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典（向后兼容）"""
@@ -88,6 +95,20 @@ class HexagramResult:
 
         if self.guaci is not None:
             result['guaci'] = self.guaci
+
+        # 时间维度断卦属性
+        if self.yue_ling is not None:
+            result['yue_ling'] = self.yue_ling
+        if self.yue_po is not None:
+            result['yue_po'] = self.yue_po
+        if self.xun_kong is not None:
+            result['xun_kong'] = self.xun_kong
+        if self.liu_shen is not None:
+            result['liu_shen'] = self.liu_shen
+        if self.yue_zhi is not None:
+            result['yue_zhi'] = self.yue_zhi
+        if self.ri_chen is not None:
+            result['ri_chen'] = self.ri_chen
 
         return result
 

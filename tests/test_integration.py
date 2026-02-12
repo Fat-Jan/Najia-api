@@ -65,3 +65,44 @@ def test_compile_without_date():
     assert gua.result is not None
     assert gua.result.solar is not None
     assert gua.result.lunar is not None
+
+
+def test_gui_hun_shi_yao():
+    """Test 归魂卦 (火天大有) - 世应在第3爻 (0-based index 2)"""
+    params = [1, 1, 1, 1, 2, 1]  # 火天大有 (归魂卦)
+    gua = Najia(verbose=0).compile(params=params, date='2023-01-01 12:00')
+
+    assert gua.result is not None
+    assert gua.result.name == '火天大有'
+    assert gua.result.gong == '乾'  # 归魂卦在乾宫
+
+    # 归魂卦：世爻在三爻 (1-based: 3, 0-based: 2)
+    assert gua.result.shiy[0] == 3  # 世爻位置 (1-based)
+    assert gua.result.shiy[1] == 6  # 应爻位置 (1-based)
+
+    # 验证世应相隔3位
+    shi_index = gua.result.shiy[0] - 1  # 转换为 0-based
+    ying_index = gua.result.shiy[1] - 1  # 转换为 0-based
+    assert shi_index == 2  # 世爻在 index 2 (第三爻)
+    assert ying_index == 5  # 应爻在 index 5 (第六爻)
+    assert abs(ying_index - shi_index) == 3  # 应与世相隔3位
+
+
+def test_you_hun_shi_yao():
+    """Test 游魂卦 (火地晋) - 世应在第4爻 (0-based index 3)"""
+    params = [2, 2, 2, 1, 2, 1]  # 火地晋 (游魂卦)
+    gua = Najia(verbose=0).compile(params=params, date='2023-01-01 12:00')
+
+    assert gua.result is not None
+    assert gua.result.name == '火地晋'
+    assert gua.result.gong == '乾'  # 游魂卦也在乾宫
+
+    # 游魂卦：世爻在四爻 (1-based: 4, 0-based: 3)
+    assert gua.result.shiy[0] == 4  # 世爻位置 (1-based)
+    assert gua.result.shiy[1] == 1  # 应爻位置 (1-based)
+
+    # 验证世应相隔3位
+    shi_index = gua.result.shiy[0] - 1  # 转换为 0-based
+    ying_index = gua.result.shiy[1] - 1  # 转换为 0-based
+    assert shi_index == 3  # 世爻在 index 3 (第四爻)
+    assert ying_index == 0  # 应爻在 index 0 (第一爻)

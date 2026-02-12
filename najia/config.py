@@ -33,6 +33,22 @@ class UserConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'UserConfig':
         """从字典创建配置"""
+        # 验证配置值的有效性
+        if 'verbose_level' in data and (not isinstance(data['verbose_level'], int) or data['verbose_level'] < 0 or data['verbose_level'] > 2):
+            data['verbose_level'] = 2
+
+        if 'max_workers' in data and (not isinstance(data['max_workers'], int) or data['max_workers'] < 1 or data['max_workers'] > 32):
+            data['max_workers'] = 4
+
+        if 'timeout' in data and (not isinstance(data['timeout'], int) or data['timeout'] < 1 or data['timeout'] > 300):
+            data['timeout'] = 30
+
+        if 'output_format' in data and data['output_format'] not in ["text", "json", "dict"]:
+            data['output_format'] = "text"
+
+        if 'language' in data and data['language'] not in ["zh_CN", "zh_TW", "en"]:
+            data['language'] = "zh_CN"
+
         return cls(**data)
 
     @classmethod

@@ -29,9 +29,9 @@ from .utils import GZ5X
 from .utils import palace
 from .utils import set_shi_yao
 from .result import HexagramResult, HiddenHexagram, TransformedHexagram
+from .log import setup_logger
 
-logging.basicConfig(level='INFO')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 class Najia(object):

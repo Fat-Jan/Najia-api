@@ -2,10 +2,12 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import time
 
 from .result import HexagramResult
+from .log import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 @dataclass
@@ -69,7 +71,7 @@ class BatchProcessor:
                 processing_time=0.0
             )
 
-        start_time = __import__('time').time()
+        start_time = time.time()
         results = []
         errors = []
         success_count = 0
@@ -122,7 +124,7 @@ class BatchProcessor:
                 except Exception as e:
                     errors.append(f"Error processing params {params_list[i]}: {str(e)}")
 
-        processing_time = __import__('time').time() - start_time
+        processing_time = time.time() - start_time
 
         return BatchResult(
             results=results,
@@ -156,7 +158,7 @@ class BatchProcessor:
                 processing_time=0.0
             )
 
-        start_time = __import__('time').time()
+        start_time = time.time()
         results = []
         errors = []
         success_count = 0
@@ -185,7 +187,7 @@ class BatchProcessor:
                 logger.error(error_msg)
                 errors.append(error_msg)
 
-        processing_time = __import__('time').time() - start_time
+        processing_time = time.time() - start_time
 
         return BatchResult(
             results=results,

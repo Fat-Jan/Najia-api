@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Tuple, List, Optional, Dict, Any
 
 from . import const
+from .log import setup_logger
 
-logging.basicConfig(level='INFO')
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 def GZ5X(gz: str = '') -> str:

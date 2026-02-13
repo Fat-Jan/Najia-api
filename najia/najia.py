@@ -3,7 +3,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Sequence
 
 import arrow
 from jinja2 import Template
@@ -108,7 +108,7 @@ class Najia(object):
         return result
 
     @staticmethod
-    def _hidden(gong_idx: int = None, qins: List[str] = None) -> Optional[HiddenHexagram]:
+    def _hidden(gong_idx: int, qins: List[str]) -> Optional[HiddenHexagram]:
         """
         计算伏神卦
         :param gong_idx: 卦宫索引
@@ -145,7 +145,7 @@ class Najia(object):
         return None
 
     @staticmethod
-    def _transform(params: List[int] = None, gong_idx: int = None) -> Optional[TransformedHexagram]:
+    def _transform(params: List[int], gong_idx: int) -> Optional[TransformedHexagram]:
         """
         计算变卦
         :param params: 爻位参数列表
@@ -155,7 +155,7 @@ class Najia(object):
         if params is None:
             raise ValueError('params parameter is required for calculating transformed hexagram')
 
-        if type(params) == str:
+        if isinstance(params, str):
             params = [x for x in params]
 
         if len(params) < 6:
@@ -178,9 +178,9 @@ class Najia(object):
 
         return None
 
-    def compile(self, params: List[int] = None, gender: str = None, date: str = None,
-                title: str = None, guaci: bool = False, 
-                yue_zhi: str = None, ri_chen: str = None, **kwargs) -> 'Najia':
+    def compile(self, params: Optional[List[int]] = None, gender: Optional[str] = None,
+                date: Optional[str] = None, title: Optional[str] = None, guaci: bool = False,
+                yue_zhi: Optional[str] = None, ri_chen: Optional[str] = None, **kwargs) -> 'Najia':
         """
         根据参数编译卦
         :param params: 爻位参数列表
@@ -210,6 +210,9 @@ class Najia(object):
             except:
                 pass
 
+        if params is None:
+            raise ValueError('params parameter is required for compiling hexagram')
+            
         # 卦码
         mark = ''.join([str(int(p) % 2) for p in params])
 

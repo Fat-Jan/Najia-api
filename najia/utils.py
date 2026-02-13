@@ -2,7 +2,7 @@ import logging
 import math
 from functools import lru_cache
 from pathlib import Path
-from typing import Tuple, List, Optional, Dict, Any
+from typing import Tuple, List, Optional, Dict, Any, Union
 
 from . import const
 from .log import setup_logger
@@ -34,18 +34,20 @@ def mark(symbol: str = None) -> List[str]:
     return res
 
 
-def xkong(gz: str = '甲子') -> str:
+def xkong(gz: Union[str, Tuple[int, int]] = '甲子') -> str:
     """
     计算旬空
-    :param gz: 甲子 or 3,11
+    :param gz: 甲子 or (3,11)
     :return: 旬空字符串
     """
-
-    gm, zm = [i for i in gz]
-
-    if type(gz) == str:
+    # 处理字符串形式
+    if isinstance(gz, str):
+        gm, zm = gz[0], gz[1]
         gm = const.GANS.index(gm)
         zm = const.ZHIS.index(zm)
+    else:
+        # 处理数值形式 (gm, zm)
+        gm, zm = gz
 
     if gm == zm or zm < gm:
         zm += 12
@@ -55,7 +57,7 @@ def xkong(gz: str = '甲子') -> str:
     return const.KONG[xk]
 
 
-def get_god6(gz: str = None) -> List[str]:
+def get_god6(gz: str) -> List[str]:
     """
     六神, 根据日干五行配对六神五行
     :param gz: 日干支
@@ -64,7 +66,7 @@ def get_god6(gz: str = None) -> List[str]:
 
     gm, _ = [i for i in gz]
 
-    if type(gm) is str:
+    if isinstance(gm, str):
         gm = const.GANS.index(gm)
 
     num = math.ceil((gm + 1) / 2) - 7
@@ -78,7 +80,7 @@ def get_god6(gz: str = None) -> List[str]:
     if gm > 5:
         num += 1
 
-    return const.SHEN6[num:] + const.SHEN6[:num]
+    return list(const.SHEN6[num:] + const.SHEN6[:num])
 
 
 '''
@@ -98,7 +100,7 @@ def get_god6(gz: str = None) -> List[str]:
 # 世爻 <= 3, 应爻 = 世爻 + 3，
 # life oneself
 @lru_cache(maxsize=64)
-def set_shi_yao(symbol: str = None) -> Tuple[int, int, int]:
+def set_shi_yao(symbol: str) -> Tuple[int, int, int]:
     """
     获取世爻（优化版 - 使用预计算查表）
     :param symbol: 卦的二进制码
@@ -189,7 +191,7 @@ def soul(symbol: str = None) -> Optional[str]:
     return hun
 
 
-def palace(symbol: str = None, index: int = None) -> int:  # inStr -> '111000'  # intNum -> 世爻
+def palace(symbol: str, index: int) -> int:  # inStr -> '111000'  # intNum -> 世爻
     """
     六爻卦的卦宫名
     认宫诀：
@@ -228,8 +230,8 @@ def palace(symbol: str = None, index: int = None) -> int:  # inStr -> '111000'  
         # 使用位运算优化内卦变爻
         nei_int = int(nei, 2)
         transformed_nei = nei_int ^ 0b111  # 快速计算卦的反卦
-        symbol = format(transformed_nei, '03b')
-        return const.YAOS_DICT[symbol]
+        transformed_symbol = format(transformed_nei, '03b')
+        return const.YAOS_DICT[transformed_symbol]
 
 
 def attack(symbol: str = None) -> bool:
